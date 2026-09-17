@@ -1,10 +1,11 @@
 
 --==================================================
--- n4noware Framework API Library // STEP 5: DROPDOWN ENGINE
+-- n4noware Framework API Library // PRODUCTION READY
 --==================================================
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local UIS = game:GetService("UserInputService")
 local Player = Players.LocalPlayer
 
 -- Visual Configuration Matrix
@@ -112,12 +113,48 @@ function library:CreateWindow(config)
 		SortOrder = Enum.SortOrder.LayoutOrder
 	}, Container)
 
+	-- Dragging Logic Implementation
+	local dragging, dragInput, dragStart, startPosition
+	
+	Header.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPosition = Window.Position
+			
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragging = false
+				end
+			end)
+		end
+	end)
+	
+	Header.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+	
+	UIS.InputChanged:Connect(function(input)
+		if input == dragInput and dragging then
+			local delta = input.Position - dragStart
+			Window.Position = UDim2.new(
+				startPosition.X.Scale, 
+				startPosition.X.Offset + delta.X, 
+				startPosition.Y.Scale, 
+				startPosition.Y.Offset + delta.Y
+			)
+		end
+	end)
+
 	-- Window Instance API
 	local windowAPI = {}
 
 	-- [[ METHOD: CREATE FOLDER ]]
 	function windowAPI:CreateFolder(folderName)
 		folderName = folderName or "Folder"
+		local folderOpen = true
 
 		local FolderFrame = New("Frame", {
 			Name = folderName .. "Folder",
@@ -152,8 +189,21 @@ function library:CreateWindow(config)
 			SortOrder = Enum.SortOrder.LayoutOrder
 		}, ElementContainer)
 
-		ElementLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-			FolderFrame.Size = UDim2.new(1, 0, 0, ElementLayout.AbsoluteContentSize.Y + 50)
+		-- Dynamic size adjustment wrapper handling collapse state configurations
+		local function ResizeFolder()
+			if folderOpen then
+				FolderFrame.Size = UDim2.new(1, 0, 0, ElementLayout.AbsoluteContentSize.Y + 50)
+			else
+				FolderFrame.Size = UDim2.new(1, 0, 0, 35)
+			end
+		end
+
+		ElementLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(ResizeFolder)
+
+		FolderHeader.Activated:Connect(function()
+			folderOpen = not folderOpen
+			FolderHeader.Text = folderOpen and ("  ▼  " .. string.upper(folderName)) or ("  ►  " .. string.upper(folderName))
+			ResizeFolder()
 		end)
 
 		-- Folder Instance API
@@ -290,7 +340,6 @@ function library:CreateWindow(config)
 			local open = false
 			local selected = listOptions[1] or "None"
 
-			-- Main external container box
 			local DropdownFrame = New("Frame", {
 				Size = UDim2.new(1, 0, 0, 36),
 				BackgroundColor3 = Theme.Window,
@@ -300,7 +349,6 @@ function library:CreateWindow(config)
 			Corner(DropdownFrame, 6)
 			Stroke(DropdownFrame, 0.3)
 
-			-- Clickable Top Header button
 			local DropdownHeader = New("TextButton", {
 				Size = UDim2.new(1, 0, 0, 36),
 				BackgroundTransparency = 1,
@@ -312,7 +360,6 @@ function library:CreateWindow(config)
 				AutoButtonColor = false
 			}, DropdownFrame)
 
-			-- Shows current active option choice
 			local SelectedLabel = New("TextLabel", {
 				Size = UDim2.new(0, 120, 1, 0),
 				Position = UDim2.new(1, -155, 0, 0),
@@ -326,18 +373,16 @@ function library:CreateWindow(config)
 
 			local Indicator = New("TextLabel", {
 				Size = UDim2.new(0, 20, 1, 0),
-				Position = UDim2.new(1, -25, 0, 0),
-				BackgroundTransparency = 1,
-				Text = "▼",
-				TextColor3 = Theme.Muted,
-				TextSize = 10,
-				Font = Enum.Font.GothamMedium,
-				TextXAlignment = Enum.TextXAlignment.Center
-			}, DropdownHeader)
-
-			-- Internal list layout holder for items
-			local ListHolder = New("Frame", {
-				Size = UDim2.new(1, -16, 1, -42),
+Position = UDim2.new(1, -25, 0, 0),
+BackgroundTransparency = 1,
+Text = "▼",
+TextColor3 = Theme.Muted,
+TextSize = 10,
+Font = Enum.Font.GothamMedium,
+TextXAlignment = Enum.TextXAlignment.Center
+}, DropdownHeader)
+local ListHolder = New("Frame", {
+Size = UDim2.new(1, -16, 1, -42),
 Position = UDim2.fromOffset(8, 38),
 BackgroundTransparency = 1
 }, DropdownFrame)
@@ -349,12 +394,17 @@ local function ToggleDropdown()
 open = not open
 Indicator.Text = open and "▲" or "▼"
 local targetHeight = open and (36 + ListLayout.AbsoluteContentSize.Y + 10) or 36
-TweenService:Create(DropdownFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+local tween = TweenService:Create(DropdownFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
 Size = UDim2.new(1, 0, 0, targetHeight)
-}):Play()
+})
+tween:Play()
+-- Notify parent folder bounding limits to track layout shifts dynamically
+tween.Completed:Connect(function()
+ResizeFolder()
+end)
+ResizeFolder()
 end
 DropdownHeader.Activated:Connect(ToggleDropdown)
--- Dynamically build option rows
 for index, optionName in ipairs(listOptions) do
 local OptionButton = New("TextButton", {
 Size = UDim2.new(1, 0, 0, 28),
@@ -389,3 +439,5 @@ end
 return windowAPI
 end
 return library
+
+
