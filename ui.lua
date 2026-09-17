@@ -1,5 +1,6 @@
+
 --==================================================
--- n4noware Framework API Library // STEP 4: TOGGLE ENGINE
+-- n4noware Framework API Library // STEP 5: DROPDOWN ENGINE
 --==================================================
 
 local Players = game:GetService("Players")
@@ -66,8 +67,8 @@ function library:CreateWindow(config)
 
 	local Window = New("Frame", {
 		Name = "MainWindow",
-		Size = UDim2.fromOffset(370, 320),
-		Position = UDim2.new(0.5, -185, 0.5, -160),
+		Size = UDim2.fromOffset(370, 360),
+		Position = UDim2.new(0.5, -185, 0.5, -180),
 		BackgroundColor3 = Theme.Window,
 		BorderSizePixel = 0,
 	}, Gui)
@@ -215,7 +216,6 @@ function library:CreateWindow(config)
 			local callback = toggleConfig.Callback or function() end
 			local value = default
 
-			-- Base row selection panel
 			local ToggleButton = New("TextButton", {
 				Size = UDim2.new(1, 0, 0, 36),
 				BackgroundColor3 = Theme.Window,
@@ -231,7 +231,6 @@ function library:CreateWindow(config)
 			Corner(ToggleButton, 6)
 			Stroke(ToggleButton, 0.3)
 
-			-- The tracking rail
 			local Track = New("Frame", {
 				Size = UDim2.fromOffset(34, 18),
 				Position = UDim2.new(1, -44, 0.5, -9),
@@ -240,7 +239,6 @@ function library:CreateWindow(config)
 			}, ToggleButton)
 			Corner(Track, 9)
 
-			-- The internal moving block
 			local Knob = New("Frame", {
 				Size = UDim2.fromOffset(12, 12),
 				Position = UDim2.fromOffset(3, 3),
@@ -279,22 +277,115 @@ function library:CreateWindow(config)
 			end)
 
 			Render(true)
-
-			-- Return external hooks to control states on demand
-			local toggleAPI = {}
-			function toggleAPI:Set(newValue)
-				value = not not newValue
-				Render(false)
-				task.spawn(callback, value)
-			end
-			
-			return toggleAPI
+			return ToggleButton
 		end
 
-		return folderAPI
-	end
+		-- [[ METHOD: CREATE DROPDOWN ]]
+		function folderAPI:CreateDropdown(dropdownConfig)
+			dropdownConfig = dropdownConfig or {}
+			local dropdownText = dropdownConfig.Name or "Dropdown"
+			local listOptions = dropdownConfig.Options or {}
+			local callback = dropdownConfig.Callback or function() end
+			
+			local open = false
+			local selected = listOptions[1] or "None"
 
-	return windowAPI
+			-- Main external container box
+			local DropdownFrame = New("Frame", {
+				Size = UDim2.new(1, 0, 0, 36),
+				BackgroundColor3 = Theme.Window,
+				BorderSizePixel = 0,
+				ClipsDescendants = true
+			}, ElementContainer)
+			Corner(DropdownFrame, 6)
+			Stroke(DropdownFrame, 0.3)
+
+			-- Clickable Top Header button
+			local DropdownHeader = New("TextButton", {
+				Size = UDim2.new(1, 0, 0, 36),
+				BackgroundTransparency = 1,
+				Text = "   " .. dropdownText,
+				TextColor3 = Theme.Text,
+				TextSize = 11,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				AutoButtonColor = false
+			}, DropdownFrame)
+
+			-- Shows current active option choice
+			local SelectedLabel = New("TextLabel", {
+				Size = UDim2.new(0, 120, 1, 0),
+				Position = UDim2.new(1, -155, 0, 0),
+				BackgroundTransparency = 1,
+				Text = selected,
+				TextColor3 = Theme.Accent,
+				TextSize = 11,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = Enum.TextXAlignment.Right
+			}, DropdownHeader)
+
+			local Indicator = New("TextLabel", {
+				Size = UDim2.new(0, 20, 1, 0),
+				Position = UDim2.new(1, -25, 0, 0),
+				BackgroundTransparency = 1,
+				Text = "▼",
+				TextColor3 = Theme.Muted,
+				TextSize = 10,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = Enum.TextXAlignment.Center
+			}, DropdownHeader)
+
+			-- Internal list layout holder for items
+			local ListHolder = New("Frame", {
+				Size = UDim2.new(1, -16, 1, -42),
+Position = UDim2.fromOffset(8, 38),
+BackgroundTransparency = 1
+}, DropdownFrame)
+local ListLayout = New("UIListLayout", {
+Padding = UDim.new(0, 4),
+SortOrder = Enum.SortOrder.LayoutOrder
+}, ListHolder)
+local function ToggleDropdown()
+open = not open
+Indicator.Text = open and "▲" or "▼"
+local targetHeight = open and (36 + ListLayout.AbsoluteContentSize.Y + 10) or 36
+TweenService:Create(DropdownFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+Size = UDim2.new(1, 0, 0, targetHeight)
+}):Play()
 end
-
+DropdownHeader.Activated:Connect(ToggleDropdown)
+-- Dynamically build option rows
+for index, optionName in ipairs(listOptions) do
+local OptionButton = New("TextButton", {
+Size = UDim2.new(1, 0, 0, 28),
+BackgroundColor3 = Theme.Surface,
+BorderSizePixel = 0,
+Text = " " .. tostring(optionName),
+TextColor3 = Theme.Muted,
+TextSize = 10,
+Font = Enum.Font.GothamMedium,
+TextXAlignment = Enum.TextXAlignment.Left,
+LayoutOrder = index,
+AutoButtonColor = false
+}, ListHolder)
+Corner(OptionButton, 4)
+OptionButton.MouseEnter:Connect(function()
+TweenService:Create(OptionButton, TweenInfo.new(0.1), {BackgroundColor3 = Theme.SurfaceHover, TextColor3 = Theme.Text}):Play()
+end)
+OptionButton.MouseLeave:Connect(function()
+TweenService:Create(OptionButton, TweenInfo.new(0.1), {BackgroundColor3 = Theme.Surface, TextColor3 = Theme.Muted}):Play()
+end)
+OptionButton.Activated:Connect(function()
+selected = optionName
+SelectedLabel.Text = selected
+ToggleDropdown()
+task.spawn(callback, selected)
+end)
+end
+return DropdownFrame
+end
+return folderAPI
+end
+return windowAPI
+end
 return library
