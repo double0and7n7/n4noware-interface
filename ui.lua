@@ -1,8 +1,9 @@
 --==================================================
--- n4noware Framework API Library // STEP 1: BASE ENGINE
+-- n4noware Framework API Library // STEP 2: FOLDER ENGINE
 --==================================================
 
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local Player = Players.LocalPlayer
 
 -- Visual Configuration Matrix
@@ -41,7 +42,7 @@ local function Stroke(object, transparency, thickness)
 	stroke.Parent = object
 end
 
--- This is the core library object developers interact with first
+-- Core Library Object
 local library = {}
 
 -- [[ METHOD: CREATE MAIN WINDOW ]]
@@ -49,15 +50,12 @@ function library:CreateWindow(config)
 	config = config or {}
 	local windowName = config.Name or "n4noware UI"
 
-	-- Establish standard execution layer parent
 	local TargetParent = game:GetService("CoreGui"):FindFirstChild("RobloxGui") or Player:WaitForChild("PlayerGui")
 	
-	-- Evict older versions to prevent UI collision errors
 	if TargetParent:FindFirstChild("N4nowareFramework") then
 		TargetParent:FindFirstChild("N4nowareFramework"):Destroy()
 	end
 
-	-- Master Layer Container
 	local Gui = New("ScreenGui", {
 		Name = "N4nowareFramework",
 		ResetOnSpawn = false,
@@ -65,11 +63,10 @@ function library:CreateWindow(config)
 		ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	}, TargetParent)
 
-	-- Physical Window Frame
 	local Window = New("Frame", {
 		Name = "MainWindow",
-		Size = UDim2.fromOffset(370, 255),
-		Position = UDim2.new(0.5, -185, 0.5, -127),
+		Size = UDim2.fromOffset(370, 280),
+		Position = UDim2.new(0.5, -185, 0.5, -140),
 		BackgroundColor3 = Theme.Window,
 		BorderSizePixel = 0,
 	}, Gui)
@@ -77,14 +74,13 @@ function library:CreateWindow(config)
 	Corner(Window, 15)
 	Stroke(Window, 0.08)
 
-	-- Structural Window Header
 	local Header = New("Frame", {
 		Name = "Header",
 		Size = UDim2.new(1, 0, 0, 54),
 		BackgroundColor3 = Theme.Surface,
 		BorderSizePixel = 0,
 	}, Window)
-	Corner(Header, 15) -- Matches top edges cleanly
+	Corner(Header, 15)
 
 	local Title = New("TextLabel", {
 		Size = UDim2.new(1, -30, 1, 0),
@@ -97,7 +93,6 @@ function library:CreateWindow(config)
 		TextXAlignment = Enum.TextXAlignment.Left,
 	}, Header)
 
-	-- The target frame where elements, groups, or folders will physically render
 	local Container = New("ScrollingFrame", {
 		Name = "Container",
 		Size = UDim2.new(1, -28, 1, -68),
@@ -115,18 +110,62 @@ function library:CreateWindow(config)
 		SortOrder = Enum.SortOrder.LayoutOrder
 	}, Container)
 
-	-- Prepare the sub-API object for this specific window instance
+	-- Window Instance API
 	local windowAPI = {}
-	
-	-- Pass utility accessors internally so next components can access them
-	windowAPI.Container = Container
-	windowAPI.Theme = Theme
-	windowAPI.New = New
-	windowAPI.Corner = Corner
-	windowAPI.Stroke = Stroke
+
+	-- [[ METHOD: CREATE FOLDER ]]
+	function windowAPI:CreateFolder(folderName)
+		folderName = folderName or "Folder"
+
+		-- The physical frame containing the folder layout
+		local FolderFrame = New("Frame", {
+			Name = folderName .. "Folder",
+			Size = UDim2.new(1, 0, 0, 35), -- Shorter default size, dynamically grows
+			BackgroundColor3 = Theme.Surface,
+			BorderSizePixel = 0,
+			ClipsDescendants = true
+		}, Container)
+
+		Corner(FolderFrame, 8)
+		Stroke(FolderFrame, 0.4)
+
+		-- Folder Header Button (Clickable to minimize/expand later)
+		local FolderHeader = New("TextButton", {
+			Size = UDim2.new(1, 0, 0, 35),
+			BackgroundTransparency = 1,
+			Text = "  ▼  " .. string.upper(folderName),
+			TextColor3 = Theme.Accent,
+			TextSize = 10,
+			Font = Enum.Font.GothamBold,
+			TextXAlignment = Enum.TextXAlignment.Left,
+		}, FolderFrame)
+
+		-- Nested container inside the folder where specific toggles/buttons will sit
+		local ElementContainer = New("Frame", {
+			Name = "Elements",
+			Size = UDim2.new(1, -20, 1, -40),
+			Position = UDim2.fromOffset(10, 40),
+			BackgroundTransparency = 1,
+		}, FolderFrame)
+
+		local ElementLayout = New("UIListLayout", {
+			Padding = UDim.new(0, 5),
+			SortOrder = Enum.SortOrder.LayoutOrder
+		}, ElementContainer)
+
+		-- Automatically resize the physical folder frame based on how many items are inside it
+		ElementLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+			FolderFrame.Size = UDim2.new(1, 0, 0, ElementLayout.AbsoluteContentSize.Y + 45)
+		end)
+
+		-- Return a unique Folder API object so components target this folder specifically
+		local folderAPI = {}
+		folderAPI.ElementContainer = ElementContainer
+		
+		return folderAPI
+	end
 
 	return windowAPI
 end
 
--- Return the library object to the developer's loadstring call
 return library
