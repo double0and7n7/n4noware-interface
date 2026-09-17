@@ -1,5 +1,5 @@
 --==================================================
--- n4noware Framework API Library // STEP 2: FOLDER ENGINE
+-- n4noware Framework API Library // STEP 4: TOGGLE ENGINE
 --==================================================
 
 local Players = game:GetService("Players")
@@ -16,6 +16,7 @@ local Theme = {
 	Text = Color3.fromRGB(235, 242, 237),
 	Muted = Color3.fromRGB(132, 146, 137),
 	Accent = Color3.fromRGB(66, 225, 120),
+	AccentDark = Color3.fromRGB(24, 67, 39),
 }
 
 -- Engine Utilities
@@ -65,8 +66,8 @@ function library:CreateWindow(config)
 
 	local Window = New("Frame", {
 		Name = "MainWindow",
-		Size = UDim2.fromOffset(370, 280),
-		Position = UDim2.new(0.5, -185, 0.5, -140),
+		Size = UDim2.fromOffset(370, 320),
+		Position = UDim2.new(0.5, -185, 0.5, -160),
 		BackgroundColor3 = Theme.Window,
 		BorderSizePixel = 0,
 	}, Gui)
@@ -117,10 +118,9 @@ function library:CreateWindow(config)
 	function windowAPI:CreateFolder(folderName)
 		folderName = folderName or "Folder"
 
-		-- The physical frame containing the folder layout
 		local FolderFrame = New("Frame", {
 			Name = folderName .. "Folder",
-			Size = UDim2.new(1, 0, 0, 35), -- Shorter default size, dynamically grows
+			Size = UDim2.fromOffset(1, 35),
 			BackgroundColor3 = Theme.Surface,
 			BorderSizePixel = 0,
 			ClipsDescendants = true
@@ -129,7 +129,6 @@ function library:CreateWindow(config)
 		Corner(FolderFrame, 8)
 		Stroke(FolderFrame, 0.4)
 
-		-- Folder Header Button (Clickable to minimize/expand later)
 		local FolderHeader = New("TextButton", {
 			Size = UDim2.new(1, 0, 0, 35),
 			BackgroundTransparency = 1,
@@ -140,10 +139,9 @@ function library:CreateWindow(config)
 			TextXAlignment = Enum.TextXAlignment.Left,
 		}, FolderFrame)
 
-		-- Nested container inside the folder where specific toggles/buttons will sit
 		local ElementContainer = New("Frame", {
 			Name = "Elements",
-			Size = UDim2.new(1, -20, 1, -40),
+			Size = UDim2.new(1, -20, 1, -45),
 			Position = UDim2.fromOffset(10, 40),
 			BackgroundTransparency = 1,
 		}, FolderFrame)
@@ -153,15 +151,146 @@ function library:CreateWindow(config)
 			SortOrder = Enum.SortOrder.LayoutOrder
 		}, ElementContainer)
 
-		-- Automatically resize the physical folder frame based on how many items are inside it
 		ElementLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-			FolderFrame.Size = UDim2.new(1, 0, 0, ElementLayout.AbsoluteContentSize.Y + 45)
+			FolderFrame.Size = UDim2.new(1, 0, 0, ElementLayout.AbsoluteContentSize.Y + 50)
 		end)
 
-		-- Return a unique Folder API object so components target this folder specifically
+		-- Folder Instance API
 		local folderAPI = {}
-		folderAPI.ElementContainer = ElementContainer
-		
+
+		-- [[ METHOD: CREATE BUTTON ]]
+		function folderAPI:CreateButton(buttonConfig)
+			buttonConfig = buttonConfig or {}
+			local buttonText = buttonConfig.Name or "Button"
+			local callback = buttonConfig.Callback or function() end
+
+			local Button = New("TextButton", {
+				Size = UDim2.new(1, 0, 0, 32),
+				BackgroundColor3 = Theme.Window,
+				BorderSizePixel = 0,
+				Text = "   " .. buttonText,
+				TextColor3 = Theme.Text,
+				TextSize = 11,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				AutoButtonColor = false
+			}, ElementContainer)
+
+			Corner(Button, 6)
+			Stroke(Button, 0.3)
+
+			local Arrow = New("TextLabel", {
+				Size = UDim2.new(0, 20, 1, 0),
+				Position = UDim2.new(1, -25, 0, 0),
+				BackgroundTransparency = 1,
+				Text = "→",
+				TextColor3 = Theme.Muted,
+				TextSize = 12,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = Enum.TextXAlignment.Right
+			}, Button)
+
+			Button.MouseEnter:Connect(function()
+				TweenService:Create(Button, TweenInfo.new(0.12), {BackgroundColor3 = Theme.SurfaceHover}):Play()
+			end)
+
+			Button.MouseLeave:Connect(function()
+				TweenService:Create(Button, TweenInfo.new(0.12), {BackgroundColor3 = Theme.Window}):Play()
+			end)
+
+			Button.Activated:Connect(function()
+				task.spawn(callback)
+				Button.BackgroundColor3 = Theme.AccentDark
+				TweenService:Create(Button, TweenInfo.new(0.2), {BackgroundColor3 = Theme.Window}):Play()
+			end)
+
+			return Button
+		end
+
+		-- [[ METHOD: CREATE TOGGLE ]]
+		function folderAPI:CreateToggle(toggleConfig)
+			toggleConfig = toggleConfig or {}
+			local toggleText = toggleConfig.Name or "Toggle"
+			local default = toggleConfig.Default or false
+			local callback = toggleConfig.Callback or function() end
+			local value = default
+
+			-- Base row selection panel
+			local ToggleButton = New("TextButton", {
+				Size = UDim2.new(1, 0, 0, 36),
+				BackgroundColor3 = Theme.Window,
+				BorderSizePixel = 0,
+				Text = "   " .. toggleText,
+				TextColor3 = Theme.Text,
+				TextSize = 11,
+				Font = Enum.Font.GothamMedium,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				AutoButtonColor = false
+			}, ElementContainer)
+
+			Corner(ToggleButton, 6)
+			Stroke(ToggleButton, 0.3)
+
+			-- The tracking rail
+			local Track = New("Frame", {
+				Size = UDim2.fromOffset(34, 18),
+				Position = UDim2.new(1, -44, 0.5, -9),
+				BackgroundColor3 = Theme.Border,
+				BorderSizePixel = 0,
+			}, ToggleButton)
+			Corner(Track, 9)
+
+			-- The internal moving block
+			local Knob = New("Frame", {
+				Size = UDim2.fromOffset(12, 12),
+				Position = UDim2.fromOffset(3, 3),
+				BackgroundColor3 = Theme.Muted,
+				BorderSizePixel = 0,
+			}, Track)
+			Corner(Knob, 6)
+
+			local function Render(instant)
+				local targetTrackColor = value and Theme.AccentDark or Theme.Border
+				local targetKnobColor = value and Theme.Accent or Theme.Muted
+				local targetKnobPos = value and UDim2.fromOffset(19, 3) or UDim2.fromOffset(3, 3)
+
+				if instant then
+					Track.BackgroundColor3 = targetTrackColor
+					Knob.BackgroundColor3 = targetKnobColor
+					Knob.Position = targetKnobPos
+				else
+					TweenService:Create(Track, TweenInfo.new(0.18), {BackgroundColor3 = targetTrackColor}):Play()
+					TweenService:Create(Knob, TweenInfo.new(0.18), {BackgroundColor3 = targetKnobColor, Position = targetKnobPos}):Play()
+				end
+			end
+
+			ToggleButton.MouseEnter:Connect(function()
+				TweenService:Create(ToggleButton, TweenInfo.new(0.12), {BackgroundColor3 = Theme.SurfaceHover}):Play()
+			end)
+
+			ToggleButton.MouseLeave:Connect(function()
+				TweenService:Create(ToggleButton, TweenInfo.new(0.12), {BackgroundColor3 = Theme.Window}):Play()
+			end)
+
+			ToggleButton.Activated:Connect(function()
+				value = not value
+				Render(false)
+				task.spawn(callback, value)
+			end)
+
+			Render(true)
+
+			-- Return external hooks to control states on demand
+			local toggleAPI = {}
+			function toggleAPI:Set(newValue)
+				value = not not newValue
+				Render(false)
+				task.spawn(callback, value)
+			end
+			
+			return toggleAPI
+		end
+
 		return folderAPI
 	end
 
