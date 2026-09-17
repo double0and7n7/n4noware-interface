@@ -152,7 +152,7 @@ function library:CreateWindow(config)
     
     function windowAPI:CreateFolder(folderName)
         totalFolders = totalFolders + 1
-        local FolderModule = require(script.elements.folder)
+        local FolderModule = require(script.Parent.elements.folder)
         local folderAPI, folderCanvas = FolderModule.New(windowAPI, folderName, Theme, Utilities, ContentViewport, NavigationHub)
         
         -- Automatically render open visual state on the very first section slot
